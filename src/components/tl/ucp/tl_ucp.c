@@ -12,7 +12,7 @@
 #include "bcast/bcast.h"
 #include "alltoall/alltoall.h"
 #include "allgatherv/allgatherv.h"
-#include "allgatherv/allgather.h"
+#include "allgather/allgather.h"
 
 ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib,
                                      ucc_base_lib_attr_t  *base_attr);

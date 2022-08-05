@@ -29,7 +29,7 @@ ucc_base_coll_alg_info_t
 
 /* calculate the true start address and length of the buffer */
 void
-get_buffer_range(ucc_coll_args_t *args, ucc_coll_buffer_info_v_t *info_v,
+ar_get_buffer_range(ucc_coll_args_t *args, ucc_coll_buffer_info_v_t *info_v,
                  ucc_rank_t size, void **start, size_t *len)
 {
     size_t dt_size = ucc_dt_size(info_v->datatype);
@@ -59,7 +59,7 @@ get_buffer_range(ucc_coll_args_t *args, ucc_coll_buffer_info_v_t *info_v,
 
 /* register xgvmi memory key on the host side */
 ucc_status_t
-register_memh(ucc_tl_ucp_task_t *task, void *address, size_t length,
+ar_register_memh(ucc_tl_ucp_task_t *task, void *address, size_t length,
               ucp_mem_h *memh)
 {
     ucc_tl_ucp_lib_t *lib        = TASK_LIB(task);
@@ -84,7 +84,7 @@ register_memh(ucc_tl_ucp_task_t *task, void *address, size_t length,
 }
 
 /* pack rkey buffer */
-ucc_status_t pack_rkey(ucc_tl_ucp_task_t *task, ucp_mem_h memh, void **rkey_buf,
+ucc_status_t ar_pack_rkey(ucc_tl_ucp_task_t *task, ucp_mem_h memh, void **rkey_buf,
                        size_t *buf_size)
 {
     ucc_tl_ucp_lib_t *lib = TASK_LIB(task);
@@ -105,7 +105,7 @@ ucc_status_t pack_rkey(ucc_tl_ucp_task_t *task, ucp_mem_h memh, void **rkey_buf,
 
 /* calculate the size of allgather_offload_args_t data structure */
 size_t
-get_offload_args_packed_size(ucc_rank_t comm_size, size_t s_rkey_buf_size,
+ar_get_offload_args_packed_size(ucc_rank_t comm_size, size_t s_rkey_buf_size,
                              size_t r_rkey_buf_size)
 {
     size_t total_size = 0;
@@ -268,16 +268,16 @@ ucc_status_t ucc_tl_ucp_allgather_offload_start(ucc_coll_task_t *coll_task)
     size_t s_len = ucc_dt_size(args->src.info.datatype) * args->src.info.count;
     void *r_start = NULL;
     size_t r_len = 0;
-    get_buffer_range(args, &(args->dst.info_v), UCC_TL_TEAM_SIZE(team),
+    ar_get_buffer_range(args, &(args->dst.info_v), UCC_TL_TEAM_SIZE(team),
                      &r_start, &r_len);
     assert(args->dst.info_v.buffer == r_start);
 
     /* register xgvmi mkeys */
-    status = register_memh(task, s_start, s_len, &op->s_memh);
+    status = ar_register_memh(task, s_start, s_len, &op->s_memh);
     if (status) {
         return UCC_ERR_NO_MEMORY;
     }
-    status = register_memh(task, r_start, r_len, &op->r_memh);
+    status = ar_register_memh(task, r_start, r_len, &op->r_memh);
     if (status) {
         return UCC_ERR_NO_MEMORY;
     }
@@ -285,17 +285,17 @@ ucc_status_t ucc_tl_ucp_allgather_offload_start(ucc_coll_task_t *coll_task)
     /* pack rkey buffers */
     void *s_rkey_buf, *r_rkey_buf;
     size_t s_rkey_buf_len, r_rkey_buf_len;
-    status = pack_rkey(task, op->s_memh, &s_rkey_buf, &s_rkey_buf_len);
+    status = ar_pack_rkey(task, op->s_memh, &s_rkey_buf, &s_rkey_buf_len);
     if (status) {
         return UCC_ERR_NO_MEMORY;
     }
-    status = pack_rkey(task, op->r_memh, &r_rkey_buf, &r_rkey_buf_len);
+    status = ar_pack_rkey(task, op->r_memh, &r_rkey_buf, &r_rkey_buf_len);
     if (status) {
         return UCC_ERR_NO_MEMORY;
     }
 
     /* calculate buffer size for metadata to send to DPU */
-    size_t packed_size = get_offload_args_packed_size(
+    size_t packed_size = ar_get_offload_args_packed_size(
             UCC_TL_TEAM_SIZE(team), s_rkey_buf_len, r_rkey_buf_len);
 
     /* get an event from event pool, allocate payload buffer */
@@ -356,6 +356,9 @@ ucc_status_t ucc_tl_ucp_allgather_offload_init(ucc_base_coll_args_t *coll_args,
 {
     ucc_tl_ucp_task_t *task = ucc_tl_ucp_init_task(coll_args, team);
     *task_h = &task->super;
+
+    printf("HELLLLLO: Dispatch test\n");
+    exit(0);
 
     if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info_v.datatype)) ||
         (!UCC_IS_INPLACE(TASK_ARGS(task)) &&
