@@ -79,3 +79,6 @@ test/mpi/ucc_test_mpi
 tools/info/build_config.h
 tools/info/ucc_info
 tools/perf/ucc_perftest
+
+ucc.install
+.vscode
