@@ -111,6 +111,6 @@ mpirun  -np ${NP} \
         -x OFFLOAD_CONFIG_FILE_PATH=${CONFIG} \
         -x DPU_OFFLOAD_DBG_VERBOSE=0 \
         -x PMIX_MCA_psec=native \
-        ${RDMA_DIR}/osu-micro-benchmarks/bin/osu_iallgatherv -f -m 256:
+        ${RDMA_DIR}/osu-micro-benchmarks/bin/osu_iallgather -f -m 256:
 
 dpu_stop_daemons "${DPULIST}"

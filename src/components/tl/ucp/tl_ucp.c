@@ -12,6 +12,7 @@
 #include "bcast/bcast.h"
 #include "alltoall/alltoall.h"
 #include "allgatherv/allgatherv.h"
+#include "allgatherv/allgather.h"
 
 ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib,
                                      ucc_base_lib_attr_t  *base_attr);
@@ -263,6 +264,8 @@ __attribute__((constructor)) static void tl_ucp_iface_init(void)
 #ifdef HAVE_DPU_OFFLOAD
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHERV)] =
         ucc_tl_ucp_allgatherv_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHER)] =
+        ucc_tl_ucp_allgather_algs;
 #endif // HAVE_DPU_OFFLOAD
     ucc_components_load("tlcp_ucp", &ucc_tl_ucp.super.coll_plugins);
 }
