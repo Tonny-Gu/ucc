@@ -106,7 +106,7 @@ mpirun  -np ${NP} \
             -x UCX_HANDLE_ERRORS=bt,freeze \
         --mca coll_ucc_enable 1 \
         --mca coll_ucc_priority 100 \
-            -x UCC_TL_UCP_TUNE="allgatherv:256-inf:@${ALGO}" \
+            -x UCC_TL_UCP_TUNE="allgather:256-inf:@${ALGO}" \
             -x UCC_LOG_LEVEL=warn \
         -x OFFLOAD_CONFIG_FILE_PATH=${CONFIG} \
         -x DPU_OFFLOAD_DBG_VERBOSE=0 \

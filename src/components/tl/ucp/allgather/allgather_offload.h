@@ -20,7 +20,7 @@ enum allgather_ext_am_id {
      * and receive buffers should be pre-registered with xgvmi and the mkeys are
      * part of the message.
      */
-    UCC_TL_UCP_ALLGATHER_HOST_ARRIVE_AM_ID = 601,
+    UCC_TL_UCP_ALLGATHER_HOST_ARRIVE_AM_ID = 701,
 
     /*
      * AM message from local DPU to remote DPU to notify remote DPU that I'm

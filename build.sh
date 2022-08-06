@@ -24,4 +24,4 @@ make -j install 2>&1 | tee make.log
 # 3. build dpu daemon
 ssh $(scontrol show hostname ${SLURM_NODELIST} | grep "bf" | head -1) "sh $PWD/build.daemon.sh $PREFIX" 2>&1 | tee -a make.log
 
-make -j distclean
+# make -j distclean
