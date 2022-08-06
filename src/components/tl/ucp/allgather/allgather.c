@@ -29,32 +29,15 @@ ucc_base_coll_alg_info_t
 
 /* calculate the true start address and length of the buffer */
 void
-ar_get_buffer_range(ucc_coll_args_t *args, ucc_coll_buffer_info_v_t *info_v,
+ar_get_buffer_range(ucc_coll_args_t *args, ucc_coll_buffer_info_t *info,
                  ucc_rank_t size, void **start, size_t *len)
 {
-    size_t dt_size = ucc_dt_size(info_v->datatype);
-    int start_offset_i, end_offset_i, start_offset_g, end_offset_g;
-    ucc_rank_t i;
+    size_t dt_size = ucc_dt_size(info->datatype);
 
-    /* initialize global start and end offset to 0 */
-    start_offset_g = 0;
-    end_offset_g = 0;
-    for (i = 0; i < size; i++) {
-        start_offset_i = ucc_coll_args_get_displacement(args,
-                            info_v->displacements, i) * dt_size;
-        if (start_offset_i < start_offset_g) {
-            start_offset_g = start_offset_i;
-        }
-        end_offset_i = start_offset_i +
-                        ucc_coll_args_get_count(args, info_v->counts, i) *
-                        dt_size;
-        if (end_offset_i > end_offset_g) {
-            end_offset_g = end_offset_i;
-        }
-    }
-
-    *len = end_offset_g - start_offset_g;
-    *start = info_v->buffer + start_offset_g;
+    *len = info->count * dt_size;
+    *start = info->buffer;
+    // printf("len:%ld start:%p\n", *len, *start);
+    // exit(0);
 }
 
 /* register xgvmi memory key on the host side */
@@ -144,7 +127,8 @@ pack_allgather_offload_args(ucc_tl_ucp_task_t *task, void *s_start,
     ucc_coll_args_t   *args = &TASK_ARGS(task);
     ucc_rank_t i, size = UCC_TL_TEAM_SIZE(team);
     size_t total_size = 0;
-    size_t r_dt_size = ucc_dt_size(args->dst.info_v.datatype);
+    size_t r_dt_size = ucc_dt_size(args->dst.info.datatype);
+    size_t count = args->src.info.count;
 
     *((uint32_t *)(args_buf + total_size)) = args->coll_type;
     total_size += FIELD_SIZEOF(allgather_offload_args_t, coll_type);
@@ -169,16 +153,12 @@ pack_allgather_offload_args(ucc_tl_ucp_task_t *task, void *s_start,
     total_size += FIELD_SIZEOF(allgather_offload_args_t, r_length);
 
     for (i = 0; i < size; i++) {
-        *((uint64_t *)(args_buf + total_size)) =
-                ucc_coll_args_get_displacement(args,
-                    args->dst.info_v.displacements, i) * r_dt_size;
+        *((uint64_t *)(args_buf + total_size)) = count * i * r_dt_size;
         total_size += sizeof(uint64_t);
     }
 
     for (i = 0; i < size; i++) {
-        *((uint64_t *)(args_buf + total_size)) =
-                ucc_coll_args_get_count(args,
-                    args->dst.info_v.counts, i) * r_dt_size;
+        *((uint64_t *)(args_buf + total_size)) = count * r_dt_size;
         total_size += sizeof(uint64_t);
     }
 
@@ -268,9 +248,9 @@ ucc_status_t ucc_tl_ucp_allgather_offload_start(ucc_coll_task_t *coll_task)
     size_t s_len = ucc_dt_size(args->src.info.datatype) * args->src.info.count;
     void *r_start = NULL;
     size_t r_len = 0;
-    ar_get_buffer_range(args, &(args->dst.info_v), UCC_TL_TEAM_SIZE(team),
+    ar_get_buffer_range(args, &(args->dst.info), UCC_TL_TEAM_SIZE(team),
                      &r_start, &r_len);
-    assert(args->dst.info_v.buffer == r_start);
+    assert(args->dst.info.buffer == r_start);
 
     /* register xgvmi mkeys */
     status = ar_register_memh(task, s_start, s_len, &op->s_memh);
@@ -331,12 +311,11 @@ ucc_status_t ucc_tl_ucp_allgather_offload_start(ucc_coll_task_t *coll_task)
 
     /* deliver local data */
     int rank = UCC_TL_TEAM_RANK(team);
-    size_t r_displacement = ucc_coll_args_get_displacement(args,
-                                args->dst.info_v.displacements, rank) *
-                            ucc_dt_size(args->dst.info_v.datatype);
-    size_t r_size = ucc_coll_args_get_count(args, args->dst.info_v.counts,
-                                rank) *
-                    ucc_dt_size(args->dst.info_v.datatype);
+    size_t count = args->src.info.count;
+    size_t r_displacement = count * rank *
+                            ucc_dt_size(args->dst.info.datatype);
+    size_t r_size = count *
+                    ucc_dt_size(args->dst.info.datatype);
     assert(s_len <= r_size);
     memcpy(r_start + r_displacement, s_start, r_size);
 
@@ -357,10 +336,7 @@ ucc_status_t ucc_tl_ucp_allgather_offload_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_task_t *task = ucc_tl_ucp_init_task(coll_args, team);
     *task_h = &task->super;
 
-    printf("HELLLLLO: Dispatch test\n");
-    exit(0);
-
-    if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info_v.datatype)) ||
+    if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info.datatype)) ||
         (!UCC_IS_INPLACE(TASK_ARGS(task)) &&
          (!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).src.info.datatype)))) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
@@ -394,7 +370,7 @@ ucc_status_t ucc_tl_ucp_allgather_offload_init(ucc_base_coll_args_t *coll_args,
 ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *task);
 ucc_status_t ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *task);
 
-ucc_status_t ucc_tl_ucp_allgather_init_common(ucc_tl_ucp_task_t *task)
+ucc_status_t ucc_tl_ucp_allgather_ring_init_common(ucc_tl_ucp_task_t *task)
 {
     if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info.datatype)) ||
         (!UCC_IS_INPLACE(TASK_ARGS(task)) &&
