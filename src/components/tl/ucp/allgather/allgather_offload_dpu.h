@@ -93,7 +93,7 @@ unpack_allgather_offload_args(void *data, allgather_offload_args_t *args)
 
 /* import xgvmi memory key on the dpu side */
 static int
-ar_import_memh(execution_context_t *context, void *address, size_t length,
+ag_import_memh(execution_context_t *context, void *address, size_t length,
             void *rkey_buf, ucp_mem_h *memh)
 {
     ucp_context_h ucp_context = context->engine->ucp_context;
@@ -215,7 +215,7 @@ pack_allgather_offload_dpu_rts(allgather_offload_coll_t *op,
 
 /* add a matched receive (RDMA READ) subop to pending_receives list */
 static int
-ar_add_receive(execution_context_t *context, allgather_offload_coll_t *op,
+ag_add_receive(execution_context_t *context, allgather_offload_coll_t *op,
             allgather_offload_subop_t *subop,
             allgather_offload_dpu_rts_t *args)
 {
@@ -269,7 +269,7 @@ ar_add_receive(execution_context_t *context, allgather_offload_coll_t *op,
 
 /* complete the whole coll op */
 static int
-ar_complete_op(execution_context_t *context, allgather_offload_coll_t *op)
+ag_complete_op(execution_context_t *context, allgather_offload_coll_t *op)
 {
     int rc;
 
@@ -347,7 +347,7 @@ ar_complete_op(execution_context_t *context, allgather_offload_coll_t *op)
 
 /* UCC_TL_UCP_ALLGATHER_HOST_ARRIVE_AM_ID */
 static int
-ar_host_arrive_am_cb(struct dpu_offload_ev_sys *ev_sys,
+ag_host_arrive_am_cb(struct dpu_offload_ev_sys *ev_sys,
                   execution_context_t *context, struct am_header *hdr,
                   size_t hdr_size, void *data, size_t data_len)
 {
@@ -384,12 +384,12 @@ ar_host_arrive_am_cb(struct dpu_offload_ev_sys *ev_sys,
     ucs_list_head_init(&op->r_posted);
 
     /* import xgvmi shared key to create alias memory handles */
-    rc = ar_import_memh(context, (void *)args->s_start, args->s_length,
+    rc = ag_import_memh(context, (void *)args->s_start, args->s_length,
                      args->s_rkey_buf, &op->s_memh);
     if (rc) {
         return UCS_ERR_NO_MEMORY;
     }
-    rc = ar_import_memh(context, (void *)args->r_start, args->r_length,
+    rc = ag_import_memh(context, (void *)args->r_start, args->r_length,
                      args->r_rkey_buf, &op->r_memh);
     if (rc) {
         return UCS_ERR_NO_MEMORY;
@@ -475,7 +475,7 @@ ar_host_arrive_am_cb(struct dpu_offload_ev_sys *ev_sys,
 
 /* UCC_TL_UCP_ALLGATHER_DPU_RTS_AM_ID */
 static int
-ar_dpu_rts_am_cb(struct dpu_offload_ev_sys *ev_sys, execution_context_t *context,
+ag_dpu_rts_am_cb(struct dpu_offload_ev_sys *ev_sys, execution_context_t *context,
               struct am_header *hdr, size_t hdr_size, void *data,
               size_t data_len)
 {
@@ -533,9 +533,9 @@ ar_dpu_rts_am_cb(struct dpu_offload_ev_sys *ev_sys, execution_context_t *context
     ucs_list_add_tail(&op->r_posted, &subop->super);
 
     /* add this receive op to pending_receives list */
-    rc = ar_add_receive(context, op, subop, args);
+    rc = ag_add_receive(context, op, subop, args);
     if (rc) {
-        ucs_error("ar_add_receive() failed");
+        ucs_error("ag_add_receive() failed");
         return UCS_ERR_NO_MESSAGE;
     }
 
@@ -544,7 +544,7 @@ ar_dpu_rts_am_cb(struct dpu_offload_ev_sys *ev_sys, execution_context_t *context
 
 /* UCC_TL_UCP_ALLGATHER_DPU_ACK_AM_ID */
 static int
-ar_dpu_ack_am_cb(struct dpu_offload_ev_sys *ev_sys, execution_context_t *context,
+ag_dpu_ack_am_cb(struct dpu_offload_ev_sys *ev_sys, execution_context_t *context,
               struct am_header *hdr, size_t hdr_size, void *data,
               size_t data_len)
 {
@@ -591,7 +591,7 @@ ar_dpu_ack_am_cb(struct dpu_offload_ev_sys *ev_sys, execution_context_t *context
 
     /* complete the whole coll op if done */
     if (op->s_done == op->s_todo && op->r_done == op->r_todo) {
-        rc = ar_complete_op(context, op);
+        rc = ag_complete_op(context, op);
     }
 
     return UCS_OK;
@@ -604,7 +604,7 @@ static int register_allgather_dpu_notifications(offloading_engine_t *engine)
 
     rc = engine_register_default_notification_handler(engine,
             UCC_TL_UCP_ALLGATHER_HOST_ARRIVE_AM_ID,
-            ar_host_arrive_am_cb);
+            ag_host_arrive_am_cb);
     if (rc) {
         ucs_error("event_channel_register failed for AM ID %d",
                   UCC_TL_UCP_ALLGATHER_HOST_ARRIVE_AM_ID);
@@ -613,7 +613,7 @@ static int register_allgather_dpu_notifications(offloading_engine_t *engine)
 
     rc = engine_register_default_notification_handler(engine,
             UCC_TL_UCP_ALLGATHER_DPU_RTS_AM_ID,
-            ar_dpu_rts_am_cb);
+            ag_dpu_rts_am_cb);
     if (rc) {
         ucs_error("event_channel_register failed for AM ID %d",
                   UCC_TL_UCP_ALLGATHER_DPU_RTS_AM_ID);
@@ -622,7 +622,7 @@ static int register_allgather_dpu_notifications(offloading_engine_t *engine)
 
     rc = engine_register_default_notification_handler(engine,
             UCC_TL_UCP_ALLGATHER_DPU_ACK_AM_ID,
-            ar_dpu_ack_am_cb);
+            ag_dpu_ack_am_cb);
     if (rc) {
         ucs_error("event_channel_register failed for AM ID %d",
                   UCC_TL_UCP_ALLGATHER_DPU_ACK_AM_ID);
@@ -633,7 +633,7 @@ static int register_allgather_dpu_notifications(offloading_engine_t *engine)
 }
 
 /* progress pending RTS */
-static int ar_progress_rts(execution_context_t *context)
+static int ag_progress_rts(execution_context_t *context)
 {
     int rc;
 
@@ -658,9 +658,9 @@ static int ar_progress_rts(execution_context_t *context)
                         rts = rts_item;
 
                         /* add this receive op to pending_receives list */
-                        rc = ar_add_receive(context, op, subop, rts->payload);
+                        rc = ag_add_receive(context, op, subop, rts->payload);
                         if (rc) {
-                            ucs_error("ar_add_receive() failed");
+                            ucs_error("ag_add_receive() failed");
                             return UCS_ERR_NO_MESSAGE;
                         }
 
@@ -685,7 +685,7 @@ static int ar_progress_rts(execution_context_t *context)
 }
 
 /* progress receives */
-static int ar_progress_receive(execution_context_t *context)
+static int ag_progress_receive(execution_context_t *context)
 {
     int rc;
 
@@ -788,7 +788,7 @@ static int ar_progress_receive(execution_context_t *context)
 
             /* 3. complete the whole coll op if done */
             if (op->s_done == op->s_todo && op->r_done == op->r_todo) {
-                rc = ar_complete_op(context, op);
+                rc = ag_complete_op(context, op);
             }
         }
     }
@@ -854,11 +854,11 @@ static int ar_progress_receive(execution_context_t *context)
 }
 
 /* progress all offload operations */
-static int ar_progress_ops(execution_context_t *context)
+static int ag_progress_ops(execution_context_t *context)
 {
     int rc;
-    rc = ar_progress_rts(context);
-    rc = ar_progress_receive(context);
+    rc = ag_progress_rts(context);
+    rc = ag_progress_receive(context);
 
     return UCS_OK;
 }
